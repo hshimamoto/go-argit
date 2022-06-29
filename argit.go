@@ -30,6 +30,7 @@ func savetarball(wr *tar.Writer, fs billy.Filesystem) error {
 			Typeflag: tar.TypeReg,
 			Name:     path,
 			Size:     info.Size(),
+			Mode:     0644,
 			ModTime:  time.Now(),
 		})
 		f, err := fs.Open(path)
