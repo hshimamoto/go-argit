@@ -21,8 +21,14 @@ func main() {
 	// do init
 	if os.Args[2] == "init" {
 		fs := memfs.New()
-		fs.Create("README.md")
-		err := argit.Init(os.Args[1], fs)
+		f, err := fs.Create("README.md")
+		if err != nil {
+			log.Printf("Create: %v", err)
+			return
+		}
+		f.Write([]byte("README"))
+		f.Close()
+		err = argit.Init(os.Args[1], fs)
 		if err != nil {
 			log.Printf("%v", err)
 		}
