@@ -4,6 +4,7 @@ package argit
 import "testing"
 
 import (
+	"bytes"
 	"os"
 
 	"github.com/go-git/go-billy/v5/memfs"
@@ -14,7 +15,7 @@ const path = ".test.tar"
 func TestInitAndOpen(t *testing.T) {
 	os.Remove(path)
 	config = &Gitconfig{
-		Name: "go test",
+		Name:  "go test",
 		Email: "go test",
 	}
 	fs := memfs.New()
@@ -112,4 +113,25 @@ func TestAddCommit(t *testing.T) {
 		t.Errorf("missing file")
 		return
 	}
+	// remove local newfile
+	localfs.Remove("newfile")
+	// get newfile
+	err = r.Get(localfs, "newfile")
+	if err != nil {
+		t.Errorf("Get: %v", err)
+		return
+	}
+	// check
+	f, err = localfs.Open("newfile")
+	if err != nil {
+		t.Errorf("Open: %v", err)
+		return
+	}
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(f)
+	if buf.String() != "dummy!" {
+		t.Errorf("content mismatch")
+		return
+	}
+	f.Close()
 }
