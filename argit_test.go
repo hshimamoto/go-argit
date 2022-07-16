@@ -7,20 +7,25 @@ import (
 	"bytes"
 	"os"
 
+	"github.com/go-git/go-billy/v5"
 	"github.com/go-git/go-billy/v5/memfs"
 )
 
 const path = ".test.tar"
 
-func TestInitAndOpen(t *testing.T) {
+func initTestRepo(fs billy.Filesystem) error {
 	os.Remove(path)
 	config = &Gitconfig{
 		Name:  "go test",
 		Email: "go test",
 	}
+	return Init(path, fs)
+}
+
+func TestInitAndOpen(t *testing.T) {
 	fs := memfs.New()
 	fs.Create("README.md")
-	err := Init(path, fs)
+	err := initTestRepo(fs)
 	if err != nil {
 		t.Errorf("Init: %v", err)
 		return
@@ -134,4 +139,37 @@ func TestAddCommit(t *testing.T) {
 		return
 	}
 	f.Close()
+}
+
+func TestInitTree(t *testing.T) {
+	fs := memfs.New()
+	fs.MkdirAll("/dir/dir/dir", 0755)
+	fs.Create("/dir/dir/dir/file")
+	err := initTestRepo(fs)
+	if err != nil {
+		t.Errorf("Init: %v", err)
+		return
+	}
+	r, err := OpenRepository(path)
+	if err != nil {
+		t.Errorf("OpenRepository: %v", err)
+		return
+	}
+	files, err := r.Files()
+	if err != nil {
+		t.Errorf("Files: %v", err)
+		return
+	}
+	if len(files) != 1 {
+		t.Errorf("Files: len(files)=%d", len(files))
+		return
+	}
+	if files[0].Dir() != "/dir/dir/dir" {
+		t.Errorf("Files: dir=%s", files[0].Dir())
+		return
+	}
+	if files[0].Name() != "file" {
+		t.Errorf("Files: name=%s", files[0].Name())
+		return
+	}
 }

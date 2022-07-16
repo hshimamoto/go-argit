@@ -72,7 +72,7 @@ func Init(path string, files billy.Filesystem) error {
 		if name == ".git" {
 			return nil
 		}
-		wt.Add(name)
+		wt.Add(path[1:])
 		return nil
 	})
 	cfg, err := LoadConfig()
@@ -173,13 +173,13 @@ func (r *Repository) Logs() (object.CommitIter, error) {
 }
 
 // Files returns array of FileInfo in worktree
-func (r *Repository) Files() ([]os.FileInfo, error) {
-	files := []os.FileInfo{}
+func (r *Repository) Files() ([]FileInfo, error) {
+	files := []FileInfo{}
 	Billywalk(r.worktree.Filesystem, "/", func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
 			return nil
 		}
-		files = append(files, info)
+		files = append(files, FileInfo{info, filepath.Dir(path)})
 		return nil
 	})
 	return files, nil
