@@ -172,4 +172,87 @@ func TestInitTree(t *testing.T) {
 		t.Errorf("Files: name=%s", files[0].Name())
 		return
 	}
+	// Get test
+	localfs := memfs.New()
+	err = r.Get(localfs, "dir/dir/dir/file")
+	if err != nil {
+		t.Errorf("Get: %v", err)
+		return
+	}
+	f, err := localfs.Open("dir/dir/dir/file")
+	if err != nil {
+		t.Errorf("Open: %v", err)
+		return
+	}
+	f.Close()
+	// Put test
+	localfs.MkdirAll("dir1/dir2/dir3/dir4", 0755)
+	f, err = localfs.Create("dir1/dir2/dir3/dir4/file5")
+	if err != nil {
+		t.Errorf("Create: %v", err)
+		return
+	}
+	f.Close()
+	err = r.Put(localfs, "dir1/dir2/dir3/dir4/file5")
+	if err != nil {
+		t.Errorf("Put: %v", err)
+		return
+	}
+	err = r.Add("dir1/dir2/dir3/dir4/file5")
+	if err != nil {
+		t.Errorf("Add: %v", err)
+		return
+	}
+	err = r.Commit("go test")
+	if err != nil {
+		t.Errorf("Commit: %v", err)
+		return
+	}
+	err = r.Save(path)
+	if err != nil {
+		t.Errorf("Save: %v", err)
+		return
+	}
+	// reopen
+	r2, err := OpenRepository(path)
+	if err != nil {
+		t.Errorf("OpenRepository: %v", err)
+		return
+	}
+	files, err = r2.Files()
+	if err != nil {
+		t.Errorf("Files: %v", err)
+		return
+	}
+	if len(files) != 2 {
+		t.Errorf("Files: len(files)=%d", len(files))
+		return
+	}
+	f1 := false
+	f2 := false
+	for _, file := range files {
+		switch file.Name() {
+		case "file":
+			f1 = file.Dir() == "/dir/dir/dir"
+		case "file5":
+			f2 = file.Dir() == "/dir1/dir2/dir3/dir4"
+		}
+	}
+	if (!f1) || (!f2) {
+		t.Errorf("missing file")
+		return
+	}
+	// Get test
+	localfs2 := memfs.New()
+	err = r2.Get(localfs2, "/dir1/dir2/dir3/dir4/file5")
+	if err != nil {
+		t.Errorf("Get: %v", err)
+		return
+	}
+	f, err = localfs2.Open("dir1/dir2/dir3/dir4/file5")
+	if err != nil {
+		t.Errorf("Open: %v", err)
+		return
+	}
+	f.Close()
 }

@@ -187,15 +187,13 @@ func (r *Repository) Files() ([]FileInfo, error) {
 
 // Get extracts a file from worktree
 func (r *Repository) Get(localfs billy.Filesystem, path string) error {
-	if filepath.Base(path) != path {
-		return fmt.Errorf("directory is not supported")
-	}
 	fs := r.worktree.Filesystem
 	reader, err := fs.Open(path)
 	if err != nil {
 		return err
 	}
 	defer reader.Close()
+	localfs.MkdirAll(filepath.Dir(path), 0755)
 	writer, err := localfs.Create(path)
 	if err != nil {
 		return err
@@ -207,15 +205,13 @@ func (r *Repository) Get(localfs billy.Filesystem, path string) error {
 
 // Put stores a file into worktree
 func (r *Repository) Put(localfs billy.Filesystem, path string) error {
-	if filepath.Base(path) != path {
-		return fmt.Errorf("directory is not supported")
-	}
 	fs := r.worktree.Filesystem
 	reader, err := localfs.Open(path)
 	if err != nil {
 		return err
 	}
 	defer reader.Close()
+	fs.MkdirAll(filepath.Dir(path), 0755)
 	writer, err := fs.Create(path)
 	if err != nil {
 		return err
