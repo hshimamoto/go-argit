@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/go-git/go-billy/v5"
@@ -42,6 +43,76 @@ func savetarball(wr *tar.Writer, fs billy.Filesystem) error {
 		f.Close()
 		return nil
 	})
+}
+
+func archive(tarfile, gitdir string) error {
+	f, err := os.OpenFile(tarfile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	wr := tar.NewWriter(f)
+
+	writer := func(name string) error {
+		info, err := os.Stat(name)
+		if err != nil {
+			return err
+		}
+		wr.WriteHeader(&tar.Header{
+			Typeflag: tar.TypeReg,
+			Name:     name,
+			Size:     info.Size(),
+			Mode:     0644,
+			ModTime:  time.Now(),
+		})
+		f, err := os.Open(name)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		_, err = io.Copy(wr, f)
+		return err
+	}
+
+	curr, _ := os.Getwd()
+	err = os.Chdir(gitdir)
+	if err != nil {
+		return err
+	}
+	defer os.Chdir(curr)
+
+	// use only [HEAD config index objects/ refs/]
+	err = writer("HEAD")
+	if err != nil {
+		return err
+	}
+	err = writer("config")
+	if err != nil {
+		return err
+	}
+	err = writer("index")
+	if err != nil {
+		return err
+	}
+	err = filepath.Walk("objects/", func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
+		}
+		return writer(path)
+	})
+	if err != nil {
+		return err
+	}
+	err = filepath.Walk("refs/", func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
+		}
+		return writer(path)
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func checkout(r *git.Repository, wt *git.Worktree) error {
@@ -170,6 +241,15 @@ func OpenRepository(path string) (*Repository, error) {
 
 // CloneRepository clones url repo
 func CloneRepository(path, url string) (*Repository, error) {
+	remote := strings.HasPrefix(url, "git:") || strings.HasPrefix(url, "https:")
+	if !remote {
+		// from local filesystem
+		err := archive(path, url)
+		if err != nil {
+			return nil, err
+		}
+		return OpenRepository(path)
+	}
 	fs := memfs.New()
 	s := filesystem.NewStorage(fs, cache.NewObjectLRUDefault())
 	r, err := git.Clone(s, memfs.New(), &git.CloneOptions{
