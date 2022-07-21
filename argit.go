@@ -44,6 +44,22 @@ func savetarball(wr *tar.Writer, fs billy.Filesystem) error {
 	})
 }
 
+func checkout(r *git.Repository, wt *git.Worktree) error {
+	bi, err := r.Branches()
+	if err != nil {
+		return nil
+	}
+	defer bi.Close()
+	first, err := bi.Next()
+	if err != nil {
+		return nil
+	}
+	return wt.Checkout(&git.CheckoutOptions{
+		Force:  true,
+		Branch: first.Name(),
+	})
+}
+
 // Repository contains go-git Repository and some shortcut params
 type Repository struct {
 	*git.Repository
@@ -141,7 +157,7 @@ func OpenRepository(path string) (*Repository, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = wt.Checkout(&git.CheckoutOptions{Force: true})
+	err = checkout(r, wt)
 	if err != nil {
 		return nil, err
 	}
@@ -150,6 +166,41 @@ func OpenRepository(path string) (*Repository, error) {
 		fs:         fs,
 		worktree:   wt,
 	}, nil
+}
+
+// CloneRepository clones url repo
+func CloneRepository(path, url string) (*Repository, error) {
+	fs := memfs.New()
+	s := filesystem.NewStorage(fs, cache.NewObjectLRUDefault())
+	r, err := git.Clone(s, memfs.New(), &git.CloneOptions{
+		URL: url,
+	})
+	if err != nil {
+		return nil, err
+	}
+	wt, err := r.Worktree()
+	if err != nil {
+		return nil, err
+	}
+	err = checkout(r, wt)
+	if err != nil {
+		return nil, err
+	}
+	repo := &Repository{
+		Repository: r,
+		fs:         fs,
+		worktree:   wt,
+	}
+	err = repo.Save(path)
+	if err != nil {
+		// touch tarball to save
+		os.WriteFile(path, []byte(""), 0644)
+		err = repo.Save(path)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return repo, nil
 }
 
 // Save creats tarball which contains git repository

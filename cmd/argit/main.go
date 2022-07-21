@@ -8,8 +8,8 @@ import (
 
 	"github.com/hshimamoto/go-argit"
 
-	"github.com/go-git/go-billy/v5/osfs"
 	"github.com/go-git/go-billy/v5/memfs"
+	"github.com/go-git/go-billy/v5/osfs"
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
@@ -31,6 +31,20 @@ func main() {
 		err = argit.Init(os.Args[1], fs)
 		if err != nil {
 			log.Printf("%v", err)
+		}
+		return
+	}
+	// clone
+	if os.Args[2] == "clone" {
+		r, err := argit.CloneRepository(os.Args[1], os.Args[3])
+		if err != nil {
+			log.Printf("CloneRepository: %v", err)
+			return
+		}
+		err = r.Save(os.Args[1])
+		if err != nil {
+			log.Printf("Save: %v", err)
+			return
 		}
 		return
 	}
