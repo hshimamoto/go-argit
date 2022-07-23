@@ -73,7 +73,11 @@ func main() {
 			return
 		}
 		for _, file := range files {
-			fmt.Printf("%s %d %s\n", file.Name(), file.Size(), file.ModTime())
+			dir := file.Dir()
+			if dir == "/" {
+				dir = ""
+			}
+			fmt.Printf("%s/%s %d %s\n", dir, file.Name(), file.Size(), file.ModTime())
 		}
 	case "get":
 		fmt.Println("get")
