@@ -82,6 +82,12 @@ func archive(tarfile, gitdir string) error {
 	defer os.Chdir(curr)
 
 	// use only [HEAD config index objects/ refs/]
+	if _, err := os.Stat("packed-refs"); err == nil {
+		err = writer("packed-refs")
+		if err != nil {
+			return err
+		}
+	}
 	err = writer("HEAD")
 	if err != nil {
 		return err
