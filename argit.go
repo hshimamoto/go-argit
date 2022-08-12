@@ -2,7 +2,6 @@
 package argit
 
 import (
-	"archive/tar"
 	"fmt"
 	"io"
 	"os"
@@ -19,27 +18,19 @@ import (
 )
 
 // savetarball create tar archive
-func savetarball(wr *tar.Writer, fs billy.Filesystem) error {
-	defer wr.Flush()
+func savetarball(tf *TARFile, fs billy.Filesystem) error {
 	return Billywalk(fs, "/", func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
 			return nil
 		}
 		// remove "/"
 		path = path[1:]
-		wr.WriteHeader(&tar.Header{
-			Typeflag: tar.TypeReg,
-			Name:     path,
-			Size:     info.Size(),
-			Mode:     0644,
-			ModTime:  time.Now(),
-		})
 		f, err := fs.Open(path)
 		if err != nil {
 			// fatal
 			return err
 		}
-		io.Copy(wr, f)
+		tf.WriteRegFile(path, info, f)
 		f.Close()
 		return nil
 	})
@@ -51,27 +42,19 @@ func archive(tarfile, gitdir string) error {
 		return err
 	}
 	defer f.Close()
-	wr := tar.NewWriter(f)
+	tf := NewTARFile(f)
 
 	writer := func(name string) error {
 		info, err := os.Stat(name)
 		if err != nil {
 			return err
 		}
-		wr.WriteHeader(&tar.Header{
-			Typeflag: tar.TypeReg,
-			Name:     name,
-			Size:     info.Size(),
-			Mode:     0644,
-			ModTime:  time.Now(),
-		})
 		f, err := os.Open(name)
 		if err != nil {
 			return err
 		}
 		defer f.Close()
-		_, err = io.Copy(wr, f)
-		return err
+		return tf.WriteRegFile(name, info, f)
 	}
 
 	curr, _ := os.Getwd()
@@ -194,9 +177,9 @@ func Init(path string, files billy.Filesystem) error {
 		return err
 	}
 	defer f.Close()
-	wr := tar.NewWriter(f)
+	tf := NewTARFile(f)
 
-	return savetarball(wr, fs)
+	return savetarball(tf, fs)
 }
 
 // OpenRepository opens tarball as git repository
@@ -206,16 +189,13 @@ func OpenRepository(path string) (*Repository, error) {
 		return nil, err
 	}
 	defer f.Close()
+	tf := NewTARFile(f)
 	// setup repository files in memfs from tarball
-	rd := tar.NewReader(f)
 	fs := memfs.New()
 	for {
-		hdr, err := rd.Next()
+		hdr, rd, err := tf.ReadRegFile()
 		if err != nil {
 			break
-		}
-		if hdr.Typeflag != tar.TypeReg {
-			continue
 		}
 		f, err := fs.Create(hdr.Name)
 		if err != nil {
@@ -296,8 +276,8 @@ func (r *Repository) Save(path string) error {
 		return err
 	}
 	defer f.Close()
-	wr := tar.NewWriter(f)
-	return savetarball(wr, r.fs)
+	tf := NewTARFile(f)
+	return savetarball(tf, r.fs)
 }
 
 // Logs returns CommitIter of HEAD
