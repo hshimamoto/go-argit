@@ -36,14 +36,7 @@ func savetarball(tf *TARFile, fs billy.Filesystem) error {
 	})
 }
 
-func archive(tarfile, gitdir string) error {
-	f, err := os.OpenFile(tarfile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	tf := NewTARFile(f)
-
+func archive(tf *TARFile, gitdir string) error {
 	writer := func(name string) error {
 		info, err := os.Stat(name)
 		if err != nil {
@@ -58,7 +51,7 @@ func archive(tarfile, gitdir string) error {
 	}
 
 	curr, _ := os.Getwd()
-	err = os.Chdir(gitdir)
+	err := os.Chdir(gitdir)
 	if err != nil {
 		return err
 	}
@@ -127,8 +120,8 @@ type Repository struct {
 	worktree *git.Worktree
 }
 
-// Init creates new git repository tarball
-func Init(path string, files billy.Filesystem) error {
+// InitTARFile initializes tarball with the new git repository
+func InitTARFile(tf *TARFile, files billy.Filesystem) error {
 	fs := memfs.New()
 	s := filesystem.NewStorage(fs, cache.NewObjectLRUDefault())
 	r, err := git.Init(s, files)
@@ -171,25 +164,29 @@ func Init(path string, files billy.Filesystem) error {
 		return err
 	}
 
-	// write to tarball
+	// write to TARFile
+	return savetarball(tf, fs)
+}
+
+// Init creates new git repository tarball
+func Init(path string, files billy.Filesystem) error {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	tf := NewTARFile(f)
 
-	return savetarball(tf, fs)
+	err = InitTARFile(NewTARFile(f), files)
+	if err != nil {
+		os.Remove(path)
+		return err
+	}
+
+	return nil
 }
 
-// OpenRepository opens tarball as git repository
-func OpenRepository(path string) (*Repository, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	tf := NewTARFile(f)
+// OpenRepositoryFromTARFile setups git repository
+func OpenRepositoryFromTARFile(tf *TARFile) (*Repository, error) {
 	// setup repository files in memfs from tarball
 	fs := memfs.New()
 	for {
@@ -225,16 +222,27 @@ func OpenRepository(path string) (*Repository, error) {
 	}, nil
 }
 
-// CloneRepository clones url repo
-func CloneRepository(path, url string) (*Repository, error) {
+// OpenRepository opens tarball as git repository
+func OpenRepository(path string) (*Repository, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	return OpenRepositoryFromTARFile(NewTARFile(f))
+}
+
+// CloneTARFile clones url repo to TARFile
+func CloneTARFile(tf *TARFile, url string) error {
 	remote := strings.HasPrefix(url, "git:") || strings.HasPrefix(url, "https:")
 	if !remote {
 		// from local filesystem
-		err := archive(path, url)
+		err := archive(tf, url)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		return OpenRepository(path)
+		return nil
 	}
 	fs := memfs.New()
 	s := filesystem.NewStorage(fs, cache.NewObjectLRUDefault())
@@ -242,31 +250,44 @@ func CloneRepository(path, url string) (*Repository, error) {
 		URL: url,
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 	wt, err := r.Worktree()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	err = checkout(r, wt)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	repo := &Repository{
 		Repository: r,
 		fs:         fs,
 		worktree:   wt,
 	}
-	err = repo.Save(path)
+	return repo.SaveTARFile(tf)
+}
+
+// Clone clones url repo
+func Clone(path, url string) error {
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
 	if err != nil {
-		// touch tarball to save
-		os.WriteFile(path, []byte(""), 0644)
-		err = repo.Save(path)
-		if err != nil {
-			return nil, err
-		}
+		return err
 	}
-	return repo, nil
+	defer f.Close()
+
+	err = CloneTARFile(NewTARFile(f), url)
+	if err != nil {
+		os.Remove(path)
+		return err
+	}
+
+	return nil
+}
+
+// SaveTARFile writes git repository to TARFile
+func (r *Repository) SaveTARFile(tf *TARFile) error {
+	return savetarball(tf, r.fs)
 }
 
 // Save creats tarball which contains git repository
@@ -276,8 +297,7 @@ func (r *Repository) Save(path string) error {
 		return err
 	}
 	defer f.Close()
-	tf := NewTARFile(f)
-	return savetarball(tf, r.fs)
+	return savetarball(NewTARFile(f), r.fs)
 }
 
 // Logs returns CommitIter of HEAD

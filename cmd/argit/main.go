@@ -36,14 +36,9 @@ func main() {
 	}
 	// clone
 	if os.Args[2] == "clone" {
-		r, err := argit.CloneRepository(os.Args[1], os.Args[3])
+		err := argit.Clone(os.Args[1], os.Args[3])
 		if err != nil {
 			log.Printf("CloneRepository: %v", err)
-			return
-		}
-		err = r.Save(os.Args[1])
-		if err != nil {
-			log.Printf("Save: %v", err)
 			return
 		}
 		return
