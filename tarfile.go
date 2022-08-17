@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -26,7 +27,7 @@ func (f *TARFile) WriteRegFile(path string, info os.FileInfo, rd io.Reader) erro
 	}
 	err := f.wr.WriteHeader(&tar.Header{
 		Typeflag: tar.TypeReg,
-		Name:     path,
+		Name:     filepath.ToSlash(path),
 		Size:     info.Size(),
 		Mode:     0644,
 		ModTime:  time.Now(),
