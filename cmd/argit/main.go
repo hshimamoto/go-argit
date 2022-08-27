@@ -2,6 +2,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"os"
@@ -12,6 +13,13 @@ import (
 	"github.com/go-git/go-billy/v5/osfs"
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
+
+func ask(prompt string) string {
+	fmt.Printf("%s:", prompt)
+	s := bufio.NewScanner(os.Stdin)
+	s.Scan()
+	return s.Text()
+}
 
 func main() {
 	if len(os.Args) < 3 {
@@ -36,7 +44,22 @@ func main() {
 	}
 	// clone
 	if os.Args[2] == "clone" {
-		err := argit.Clone(os.Args[1], os.Args[3])
+		path := os.Args[1]
+		_, err := os.Stat(path)
+		flags := os.O_CREATE | os.O_EXCL | os.O_WRONLY
+		if err == nil {
+			ans := ask("overwrite?")
+			if ans[0] == 'Y' || ans[0] == 'y' {
+				flags = os.O_WRONLY | os.O_TRUNC
+			}
+		}
+		f, err := os.OpenFile(path, flags, 0644)
+		if err != nil {
+			log.Printf("OpenFile: %v", err)
+			return
+		}
+		defer f.Close()
+		err = argit.CloneTARFile(argit.NewTARFile(f), os.Args[3])
 		if err != nil {
 			log.Printf("CloneRepository: %v", err)
 			return
