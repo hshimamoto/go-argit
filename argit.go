@@ -1,4 +1,4 @@
-// MIT License Copyright (C) 2022 Hiroshi Shimamoto
+// MIT License Copyright (C) 2022, 2023 Hiroshi Shimamoto
 package argit
 
 import (
@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-git/go-billy/v5"
 	"github.com/go-git/go-billy/v5/memfs"
+	"github.com/go-git/go-billy/v5/util"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/cache"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -19,7 +20,7 @@ import (
 
 // savetarball create tar archive
 func savetarball(tf *TARFile, fs billy.Filesystem) error {
-	return Billywalk(fs, "/", func(path string, info os.FileInfo, err error) error {
+	return util.Walk(fs, "/", func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
 			return nil
 		}
@@ -133,7 +134,7 @@ func InitTARFile(tf *TARFile, files billy.Filesystem) error {
 	if err != nil {
 		return err
 	}
-	err = Billywalk(files, "/", func(path string, info os.FileInfo, err error) error {
+	err = util.Walk(files, "/", func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
 			return nil
 		}
@@ -312,7 +313,7 @@ func (r *Repository) Logs() (object.CommitIter, error) {
 // Files returns array of FileInfo in worktree
 func (r *Repository) Files() ([]FileInfo, error) {
 	files := []FileInfo{}
-	Billywalk(r.worktree.Filesystem, "/", func(path string, info os.FileInfo, err error) error {
+	util.Walk(r.worktree.Filesystem, "/", func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
 			return nil
 		}
